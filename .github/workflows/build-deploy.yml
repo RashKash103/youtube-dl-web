@@ -1,0 +1,62 @@
+name: "Build and Deploy"
+
+on:
+  push:
+    branches:
+      - "main"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker - Frontend
+        id: metadata_frontend
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
+          tags: type=sha,prefix=
+          flavor: latest=true
+
+      - name: Extract metadata for Docker - API
+        id: metadata_api
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
+          tags: type=sha,prefix=
+          flavor: latest=true
+
+      - name: Build and push Docker image - Frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.metadata_frontend.outputs.tags }}
+          labels: ${{ steps.metadata_frontend.outputs.labels }}
+
+      - name: Build and push Docker image - API
+        uses: docker/build-push-action@v4
+        with:
+          context: ./youtube-dl-web/server
+          push: true
+          tags: ${{ steps.metadata_api.outputs.tags }}
+          labels: ${{ steps.metadata_api.outputs.labels }}
